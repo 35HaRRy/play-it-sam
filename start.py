@@ -1,7 +1,10 @@
 import os
 
-import yaml
 # import tiktoken
+import asyncio
+import dotenv
+import yaml
+
 import spotipy.util as util
 
 from langchain_community.agent_toolkits.openapi.spec import reduce_openapi_spec
@@ -10,6 +13,12 @@ from langchain_community.agent_toolkits.openapi import planner
 from langchain_community.utilities.requests import RequestsWrapper
 
 from langchain_groq import ChatGroq
+
+
+dotenv.load_dotenv(dotenv.find_dotenv(filename=".env"))
+
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_PROJECT"] = "Plan-and-execute"
 
 # with open("spotify_openapi.yaml") as f:
 #     raw_spotify_api_spec = yaml.load(f, Loader=yaml.Loader)
@@ -48,10 +57,17 @@ spotify_agent = planner.create_openapi_agent(
 #     "make me a playlist with the first song from kind of blue."
 #     "call it machine blues."
 # )
-user_query = (
-    "'Test' çalma listemdeki ilk 5 şarkıyı kategorize edip listeler misin?"
-)
-spotify_agent.invoke(user_query)
+
+
+async def main():
+    while True:
+        user_query = input("Command: ")
+        agent_result = await spotify_agent.ainvoke(user_query)
+
+        print(f"agent_response is {agent_result}")
+
+asyncio.run(main())
+
 
 # endpoints = [
 #     (route, operation)
