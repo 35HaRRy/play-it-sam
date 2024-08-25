@@ -8,17 +8,22 @@ import spotipy.util as util
 
 from typing import Annotated, List, Tuple, TypedDict, Union, Literal
 
+from langchain_community.agent_toolkits.openapi.planner import _create_api_controller_tool
 from langchain_community.agent_toolkits.openapi.spec import reduce_openapi_spec
-from langchain_community.agent_toolkits.openapi.planner_prompt import API_PLANNER_PROMPT
 from langchain_community.utilities.requests import RequestsWrapper
 
 from langchain_core.pydantic_v1 import BaseModel, Field
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
+
+from langchain import hub
 
 from langchain_groq import ChatGroq
 
 from langgraph.graph import StateGraph, START
 
+from prompts import API_PLANNER_PROMPT
+
+from langgraph.prebuilt import create_react_agent
 
 dotenv.load_dotenv(dotenv.find_dotenv(filename=".env"))
 
@@ -46,11 +51,19 @@ headers = construct_spotify_auth_headers(raw_spotify_api_spec)
 requests_wrapper = RequestsWrapper(headers=headers)
 
 
+# TODO: Define OpenAPI tools or  
 # Choose the LLM that will drive the agent
 # llm = ChatGroq(model_name="gemma2-9b-it", temperature=0.0)
 llm = ChatGroq(model_name="llama-3.1-70b-versatile", temperature=0.0)
 
-tools = [TavilySearchResults(max_results=3)]
+# tools = [TavilySearchResults(max_results=3)]
+tools = [_create_api_controller_tool(
+    spotify_api_spec,
+    requests_wrapper,
+    llm,
+    allow_dangerous_requests = True,
+    allowed_operations=["GET", "POST", "PUT", "DELETE", "PATCH"],
+)]
 
 # Get the prompt to use - you can modify this!
 prompt = hub.pull("wfh/react-agent-executor")
@@ -73,10 +86,13 @@ class Plan(BaseModel):
         description="different steps to follow, should be in sorted order"
     )
 
+endpoint_descriptions = [
+    f"{name} {description}" for name, description, _ in spotify_api_spec.endpoints
+]
 
-# planner_prompt = ChatPromptTemplate.from_messages([
-#     (
-#         "system",
+planner_prompt = ChatPromptTemplate.from_messages([
+    (
+        "system",
 #         """For the given objective, come up with a simple step by step plan. \
 # This plan should involve individual tasks, \
 # that if executed correctly will yield the correct answer. \
@@ -84,22 +100,11 @@ class Plan(BaseModel):
 # The result of the final step should be the final answer. \
 # Make sure that each step has all the information needed.\
 # do not skip steps.""",
-#     ),
-#     ("placeholder", "{messages}"),
-# ])
-
-endpoint_descriptions = [
-    f"{name} {description}" for name, description, _ in spotify_api_spec.endpoints
-]
-planner_prompt = ChatPromptTemplate.from_messages([
-    (
-        "system",
-        API_PLANNER_PROMPT,
-#     input_variables=["query"],
-#     partial_variables={"endpoints": "- " + "- ".join(endpoint_descriptions)},
-# )
+        API_PLANNER_PROMPT
     ),
-    ("placeholder", "{query}"),
+    # ("placeholder", "{messages}"),
+    ("user", """User query: {messages}
+Plan:""")
 ])
 
 planner = planner_prompt | ChatGroq(
@@ -181,7 +186,12 @@ You are tasked with executing step {1}, {task}."""
 
 
 async def plan_step(state: PlanExecute):
-    plan = await planner.ainvoke({"messages": [("user", state["input"])]})
+    # plan = await planner.ainvoke({"messages": [("user", state["input"])]})
+    plan = await planner.ainvoke({
+        "messages": state["input"],
+        "endpoints": "- " + "- ".join(endpoint_descriptions)
+    })
+
     return {"plan": plan.steps}
 
 
