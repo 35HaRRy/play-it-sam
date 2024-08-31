@@ -51,11 +51,11 @@ headers = construct_spotify_auth_headers(raw_spotify_api_spec)
 requests_wrapper = RequestsWrapper(headers=headers)
 
 
-# TODO: Define OpenAPI tools or  
 # Choose the LLM that will drive the agent
 # llm = ChatGroq(model_name="gemma2-9b-it", temperature=0.0)
 llm = ChatGroq(model_name="llama-3.1-70b-versatile", temperature=0.0)
 
+#TODO: Create tools based on _create_api_controller_agent
 # tools = [TavilySearchResults(max_results=3)]
 tools = [_create_api_controller_tool(
     spotify_api_spec,
@@ -65,6 +65,7 @@ tools = [_create_api_controller_tool(
     allowed_operations=["GET", "POST", "PUT", "DELETE", "PATCH"],
 )]
 
+#TODO: Create prompt based on _create_api_controller_agent
 # Get the prompt to use - you can modify this!
 prompt = hub.pull("wfh/react-agent-executor")
 prompt.pretty_print()
