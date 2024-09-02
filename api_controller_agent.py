@@ -25,6 +25,7 @@ from langgraph.graph.message import add_messages
 from langgraph.managed import IsLastStep
 from langgraph.prebuilt.tool_node import ToolNode
 
+
 # This simply involves a list of messages
 # We want steps to return messages to append to the list
 # So we annotate the messages attribute with operator.add
@@ -47,6 +48,7 @@ StateModifier = Union[
     Callable[[StateSchema], Sequence[BaseMessage]],
     Runnable[StateSchema, Sequence[BaseMessage]],
 ]
+
 
 def _get_state_modifier_runnable(state_modifier: Optional[StateModifier]) -> Runnable:
     state_modifier_runnable: Runnable
@@ -78,9 +80,10 @@ def _get_state_modifier_runnable(state_modifier: Optional[StateModifier]) -> Run
 
     return state_modifier_runnable
 
+
 def create_api_controller_agent(
     model: LanguageModelLike,
-    tools:  Sequence[BaseTool],
+    tools: Sequence[BaseTool],
     *,
     state_schema: Optional[StateSchemaType] = None,
     state_modifier: Optional[StateModifier] = None,
@@ -362,11 +365,13 @@ def create_api_controller_agent(
 
     model = model.bind_tools(tools)
 
-    # TODO: Get should_continue function as parameter. Eğer sırada tool çağrımı varsa devam et.
+    # TODO: Bu metodu dışarıya çıkarmaya gerek var mı?
+    # TODO: Sırada tool çağrımı varsa devam etmeli. Kod bu koşulu sağlıyor mu?
     # Define the function that determines whether to continue or not
     def should_continue(state: AgentState):
         messages = state["messages"]
         last_message = messages[-1]
+
         # If there is no function call, then we finish
         if not last_message.tool_calls:
             return "end"
